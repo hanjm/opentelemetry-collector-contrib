@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"github.com/open-telemetry/opentelemetry-log-collection/entry"
-	"go.opentelemetry.io/collector/consumer/pdata"
+	"go.opentelemetry.io/collector/model/pdata"
 	"go.uber.org/zap"
 )
 
@@ -269,14 +269,14 @@ func (c *Converter) batchLoop() {
 
 			pLogs, ok := c.data[wi.ResourceString]
 			if ok {
-				pLogs.ResourceLogs().
+				lr := pLogs.ResourceLogs().
 					At(0).InstrumentationLibraryLogs().
-					At(0).Logs().Append(wi.LogRecord)
+					At(0).Logs().AppendEmpty()
+				wi.LogRecord.CopyTo(lr)
 			} else {
 				pLogs = pdata.NewLogs()
 				logs := pLogs.ResourceLogs()
-				logs.Resize(1)
-				rls := logs.At(0)
+				rls := logs.AppendEmpty()
 
 				resource := rls.Resource()
 				resourceAtts := resource.Attributes()
@@ -286,8 +286,8 @@ func (c *Converter) batchLoop() {
 				}
 
 				ills := rls.InstrumentationLibraryLogs()
-				ills.Resize(1)
-				ills.At(0).Logs().Append(wi.LogRecord)
+				lr := ills.AppendEmpty().Logs().AppendEmpty()
+				wi.LogRecord.CopyTo(lr)
 			}
 
 			c.data[wi.ResourceString] = pLogs
@@ -522,9 +522,9 @@ func toAttributeMap(obsMap map[string]interface{}) pdata.AttributeValue {
 func toAttributeArray(obsArr []interface{}) pdata.AttributeValue {
 	arrVal := pdata.NewAttributeValueArray()
 	arr := arrVal.ArrayVal()
-	arr.Resize(len(obsArr))
-	for i, v := range obsArr {
-		insertToAttributeVal(v, arr.At(i))
+	arr.EnsureCapacity(len(obsArr))
+	for _, v := range obsArr {
+		insertToAttributeVal(v, arr.AppendEmpty())
 	}
 	return arrVal
 }
